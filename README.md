@@ -96,6 +96,24 @@ python build_universe.py us-all   # tulis ulang universe/us.txt dari Nasdaq Trad
 | `min_sinyal_gabungan` | Min. jumlah sinyal barengan buat masuk "Sinyal Kuat" (mis. 3) |
 | `max_hasil_per_kategori` | Maks saham ditampilkan per kategori |
 
+## 🎮 Kontrol dari Telegram
+
+Bot bisa dikontrol langsung dari chat. Command yang ngubah setting otomatis **edit config & commit balik ke GitHub**, jadi permanen & kepakai di scan berikutnya (delay ±5 mnt di mode cron).
+
+| Command | Fungsi |
+|---|---|
+| `/harga BBCA.JK` | Harga terkini + perubahan % + RSI |
+| `/list` | Daftar watchlist |
+| `/scan` | Jalanin screener sekarang juga |
+| `/tambah BBRI.JK 6000 4000` | Tambah/pantau saham (batas atas & bawah opsional) |
+| `/hapus BBRI.JK` | Hapus dari watchlist |
+| `/scanadd ANTM.JK` | Tambah saham ke universe scan massal |
+| `/scandel ANTM.JK` | Hapus dari universe scan |
+| `/set gap 5` | Ubah kriteria: `naik`/`volume`/`gap`/`rsi_ob`/`rsi_os`/`sinyal` |
+| `/help` | Bantuan lengkap |
+
+> Angka bisa pakai singkatan: `6rb`/`6k` = 6000, `2jt` = 2.000.000. Cuma chat pemilik (`TELEGRAM_CHAT_ID`) yang dilayani.
+
 ## ⚡ Balasan Telegram INSTAN (host nyala-terus)
 
 Listener GitHub (cron) balesnya delay s/d 5 menit. Buat balasan `/harga` **< 1 detik**, jalankan `listener_loop.py` (long-polling) di host nyala-terus. File deploy udah disiapin: `Procfile` + `render.yaml`.

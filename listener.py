@@ -38,12 +38,19 @@ OFFSET_PATH = os.path.join(os.path.dirname(__file__), "tg_offset.json")
 
 BANTUAN = (
     "🤖 <b>Bot Pemantau Saham</b>\n\n"
-    "Command yang bisa dipakai:\n"
+    "<b>Info:</b>\n"
     "• <code>/harga BBCA.JK</code> — harga terkini + perubahan\n"
-    "• <code>/list</code> — daftar saham yang dipantau\n"
-    "• <code>/help</code> — bantuan ini\n\n"
-    "Kode ticker: IDX pakai <code>.JK</code> (BBCA.JK), US polos (AAPL), "
-    "crypto <code>-USD</code> (BTC-USD)."
+    "• <code>/list</code> — daftar saham watchlist\n"
+    "• <code>/scan</code> — jalanin screener sekarang\n\n"
+    "<b>Kelola watchlist:</b>\n"
+    "• <code>/tambah BBRI.JK 6000 4000</code> — pantau saham (batas atas, batas bawah opsional)\n"
+    "• <code>/hapus BBRI.JK</code> — berhenti pantau\n\n"
+    "<b>Kelola screener:</b>\n"
+    "• <code>/scanadd ANTM.JK</code> — tambah ke daftar scan massal\n"
+    "• <code>/scandel ANTM.JK</code> — hapus dari daftar scan\n"
+    "• <code>/set gap 5</code> — ubah kriteria (naik/volume/gap/rsi_ob/rsi_os/sinyal)\n\n"
+    "Ticker: IDX pakai <code>.JK</code>, US polos (AAPL), crypto <code>-USD</code>.\n"
+    "<i>Perubahan disimpan ke GitHub, kepakai di scan berikutnya (±5 mnt).</i>"
 )
 
 
@@ -104,6 +111,149 @@ def handle_list(chat_id):
     kirim(chat_id, "\n".join(baris) if len(baris) > 1 else "Watchlist kosong.")
 
 
+def simpan_config(cfg):
+    with open(bot.CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+def _num(s):
+    """Parse angka, dukung '6rb'/'6k' -> 6000. Return float atau None."""
+    s = s.lower().replace(".", "").replace(",", ".")
+    kali = 1
+    if s.endswith(("rb", "k")):
+        kali, s = 1000, s.rstrip("rbk")
+    elif s.endswith("jt"):
+        kali, s = 1_000_000, s[:-2]
+    try:
+        return float(s) * kali
+    except ValueError:
+        return None
+
+
+def handle_tambah(chat_id, args):
+    if not args:
+        kirim(chat_id, "Format: <code>/tambah BBRI.JK 6000 4000</code> (batas atas & bawah opsional)")
+        return
+    ticker = args[0].upper()
+    atas = _num(args[1]) if len(args) > 1 else None
+    bawah = _num(args[2]) if len(args) > 2 else None
+    cfg = bot.load_config()
+    wl = cfg.setdefault("watchlist", [])
+    entri = next((w for w in wl if w["ticker"].upper() == ticker), None)
+    if entri is None:
+        entri = {"ticker": ticker, "name": ticker}
+        wl.append(entri)
+        aksi = "ditambahkan"
+    else:
+        aksi = "diupdate"
+    if atas is not None:
+        entri["batas_atas"] = atas
+    if bawah is not None:
+        entri["batas_bawah"] = bawah
+    simpan_config(cfg)
+    kirim(chat_id, f"✅ <b>{ticker}</b> {aksi} ke watchlist.\n"
+                   f"Batas atas: {entri.get('batas_atas','-')}, bawah: {entri.get('batas_bawah','-')}")
+
+
+def handle_hapus(chat_id, args):
+    if not args:
+        kirim(chat_id, "Format: <code>/hapus BBRI.JK</code>")
+        return
+    ticker = args[0].upper()
+    cfg = bot.load_config()
+    wl = cfg.get("watchlist", [])
+    baru = [w for w in wl if w["ticker"].upper() != ticker]
+    if len(baru) == len(wl):
+        kirim(chat_id, f"❓ <b>{ticker}</b> gak ada di watchlist.")
+        return
+    cfg["watchlist"] = baru
+    simpan_config(cfg)
+    kirim(chat_id, f"🗑️ <b>{ticker}</b> dihapus dari watchlist.")
+
+
+def _universe_path(ticker):
+    nama = "idx" if ticker.upper().endswith(".JK") else "us"
+    return os.path.join(os.path.dirname(__file__), "universe", f"{nama}.txt"), nama
+
+
+def handle_scanadd(chat_id, args):
+    if not args:
+        kirim(chat_id, "Format: <code>/scanadd ANTM.JK</code>")
+        return
+    ticker = args[0].upper()
+    path, nama = _universe_path(ticker)
+    isi = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            isi = [l.rstrip("\n") for l in f]
+    ada = any(l.strip().upper() == ticker for l in isi if not l.strip().startswith("#"))
+    if ada:
+        kirim(chat_id, f"ℹ️ <b>{ticker}</b> udah ada di universe {nama}.")
+        return
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(ticker + "\n")
+    kirim(chat_id, f"✅ <b>{ticker}</b> ditambah ke universe scan ({nama}).")
+
+
+def handle_scandel(chat_id, args):
+    if not args:
+        kirim(chat_id, "Format: <code>/scandel ANTM.JK</code>")
+        return
+    ticker = args[0].upper()
+    path, nama = _universe_path(ticker)
+    if not os.path.exists(path):
+        kirim(chat_id, f"❓ Universe {nama} gak ketemu.")
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        isi = f.readlines()
+    baru = [l for l in isi if l.strip().upper() != ticker]
+    if len(baru) == len(isi):
+        kirim(chat_id, f"❓ <b>{ticker}</b> gak ada di universe {nama}.")
+        return
+    with open(path, "w", encoding="utf-8") as f:
+        f.writelines(baru)
+    kirim(chat_id, f"🗑️ <b>{ticker}</b> dihapus dari universe scan ({nama}).")
+
+
+SET_MAP = {
+    "naik": "perubahan_persen_min",
+    "volume": "volume_vs_rata2_min",
+    "gap": "gap_persen_min",
+    "rsi_ob": "rsi_overbought",
+    "rsi_os": "rsi_oversold",
+    "sinyal": "min_sinyal_gabungan",
+}
+
+
+def handle_set(chat_id, args):
+    if len(args) < 2:
+        kirim(chat_id, "Format: <code>/set gap 5</code>\n"
+                       "Param: naik, volume, gap, rsi_ob, rsi_os, sinyal")
+        return
+    param = args[0].lower()
+    if param not in SET_MAP:
+        kirim(chat_id, f"❓ Param '{param}' gak dikenal. Pilih: {', '.join(SET_MAP)}")
+        return
+    val = _num(args[1])
+    if val is None:
+        kirim(chat_id, "Nilainya harus angka.")
+        return
+    cfg = bot.load_config()
+    kriteria = cfg.setdefault("screener", {}).setdefault("kriteria", {})
+    kriteria[SET_MAP[param]] = val
+    simpan_config(cfg)
+    kirim(chat_id, f"✅ Kriteria <b>{param}</b> = {val:g} disimpan.")
+
+
+def handle_scan(chat_id):
+    kirim(chat_id, "⏳ Screener lagi jalan, tunggu 1-3 menit ya...")
+    try:
+        import screener
+        screener.main()
+    except Exception as e:
+        kirim(chat_id, f"❌ Scan gagal: {e}")
+
+
 def proses_pesan(msg):
     chat = msg.get("chat", {})
     chat_id = chat.get("id")
@@ -126,6 +276,18 @@ def proses_pesan(msg):
         handle_harga(chat_id, args)
     elif cmd == "/list":
         handle_list(chat_id)
+    elif cmd == "/tambah":
+        handle_tambah(chat_id, args)
+    elif cmd == "/hapus":
+        handle_hapus(chat_id, args)
+    elif cmd == "/scanadd":
+        handle_scanadd(chat_id, args)
+    elif cmd == "/scandel":
+        handle_scandel(chat_id, args)
+    elif cmd == "/set":
+        handle_set(chat_id, args)
+    elif cmd == "/scan":
+        handle_scan(chat_id)
     else:
         kirim(chat_id, "Command gak dikenal. Ketik /help buat lihat daftarnya.")
 

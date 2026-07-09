@@ -35,15 +35,16 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python listener.py
 
-      - name: Simpan offset (commit balik kalau berubah)
+      - name: Simpan perubahan (offset/config/universe) kalau ada
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain tg_offset.json)" ]; then
-            git add tg_offset.json
-            git commit -m "chore: update offset telegram [skip ci]"
+          # Commit balik apa pun yang diubah command Telegram: offset, config, universe
+          git add tg_offset.json config.json universe/ 2>/dev/null || true
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "chore: update dari command Telegram [skip ci]"
             git pull --rebase --autostash origin main
             git push
           else
-            echo "Offset tidak berubah, tidak commit."
+            echo "Tidak ada perubahan, tidak commit."
           fi
