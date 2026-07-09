@@ -60,6 +60,7 @@ def analisa_ticker(ticker, df):
     try:
         closes = df["Close"].dropna()
         vols = df["Volume"].dropna()
+        opens = df["Open"].dropna()
         if len(closes) < 20:
             return None
         harga = float(closes.iloc[-1])
@@ -86,6 +87,16 @@ def analisa_ticker(ticker, df):
                 elif ap >= bp and a < b:
                     cross = "death"
 
+        # 52-minggu (pakai data ~1 tahun). breakout kalau harga di/dekat high/low.
+        hi_52 = float(closes.max())
+        lo_52 = float(closes.min())
+        pct_dari_high = (harga - hi_52) / hi_52 * 100 if hi_52 > 0 else 0.0
+        pct_dari_low = (harga - lo_52) / lo_52 * 100 if lo_52 > 0 else 0.0
+
+        # Gap = pembukaan hari ini vs penutupan kemarin
+        open_now = float(opens.iloc[-1]) if len(opens) else harga
+        gap = (open_now - prev) / prev * 100 if prev > 0 else 0.0
+
         return {
             "ticker": ticker,
             "harga": harga,
@@ -93,6 +104,9 @@ def analisa_ticker(ticker, df):
             "vol_ratio": vol_ratio,
             "rsi": rsi,
             "cross": cross,
+            "pct_dari_high": pct_dari_high,
+            "pct_dari_low": pct_dari_low,
+            "gap": gap,
         }
     except Exception:
         return None
@@ -107,7 +121,7 @@ def scan_universe(tickers, chunk_size, jeda):
         try:
             data = yf.download(
                 grup,
-                period="3mo",
+                period="1y",
                 interval="1d",
                 group_by="ticker",
                 threads=True,
@@ -163,6 +177,25 @@ def bikin_laporan(hasil, kriteria, maxn):
     golden = [h for h in hasil if h["cross"] == "golden"][:maxn]
     death = [h for h in hasil if h["cross"] == "death"][:maxn]
 
+    dekat = kriteria.get("breakout_ambang_persen", 1.0)  # dianggap "breakout" kalau dalam 1% dari high/low
+    gap_min = kriteria.get("gap_persen_min", 3.0)
+    breakout_hi = sorted(
+        [h for h in hasil if h["pct_dari_high"] >= -dekat],
+        key=lambda x: x["pct_dari_high"], reverse=True,
+    )[:maxn]
+    breakout_lo = sorted(
+        [h for h in hasil if h["pct_dari_low"] <= dekat],
+        key=lambda x: x["pct_dari_low"],
+    )[:maxn]
+    gap_up = sorted(
+        [h for h in hasil if h["gap"] >= gap_min],
+        key=lambda x: x["gap"], reverse=True,
+    )[:maxn]
+    gap_down = sorted(
+        [h for h in hasil if h["gap"] <= -gap_min],
+        key=lambda x: x["gap"],
+    )[:maxn]
+
     def baris_chg(h):
         return f"  {h['ticker']}  {bot.format_harga(h['harga'])}  ({h['chg']:+.1f}%)"
 
@@ -174,6 +207,15 @@ def bikin_laporan(hasil, kriteria, maxn):
 
     def baris_cross(h):
         return f"  {h['ticker']}  {bot.format_harga(h['harga'])}"
+
+    def baris_break_hi(h):
+        return f"  {h['ticker']}  {bot.format_harga(h['harga'])}  ({h['pct_dari_high']:+.1f}% vs high 52mg)"
+
+    def baris_break_lo(h):
+        return f"  {h['ticker']}  {bot.format_harga(h['harga'])}  ({h['pct_dari_low']:+.1f}% vs low 52mg)"
+
+    def baris_gap(h):
+        return f"  {h['ticker']}  gap {h['gap']:+.1f}%  ({h['chg']:+.1f}% skrg)"
 
     seksi = []
     if gainers:
@@ -190,6 +232,14 @@ def bikin_laporan(hasil, kriteria, maxn):
         seksi.append("✨ <b>Golden Cross</b>\n" + "\n".join(baris_cross(h) for h in golden))
     if death:
         seksi.append("💀 <b>Death Cross</b>\n" + "\n".join(baris_cross(h) for h in death))
+    if breakout_hi:
+        seksi.append("🚀 <b>Breakout High 52mg</b>\n" + "\n".join(baris_break_hi(h) for h in breakout_hi))
+    if breakout_lo:
+        seksi.append("🕳️ <b>Tembus Low 52mg</b>\n" + "\n".join(baris_break_lo(h) for h in breakout_lo))
+    if gap_up:
+        seksi.append("⬆️ <b>Gap Up</b>\n" + "\n".join(baris_gap(h) for h in gap_up))
+    if gap_down:
+        seksi.append("⬇️ <b>Gap Down</b>\n" + "\n".join(baris_gap(h) for h in gap_down))
 
     return seksi
 

@@ -37,7 +37,9 @@
       "volume_vs_rata2_min": 2.0,
       "rsi_oversold": 30,
       "rsi_overbought": 70,
-      "golden_death_cross": true
+      "golden_death_cross": true,
+      "breakout_ambang_persen": 1.0,
+      "gap_persen_min": 3.0
     },
     "max_hasil_per_kategori": 15,
     "chunk_size": 100,
