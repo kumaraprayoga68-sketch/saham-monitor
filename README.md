@@ -44,6 +44,25 @@ python bot.py
 ```
 Bot bakal cek tiap `interval_minutes` (default 15 menit) dan kirim alert otomatis. Stop dengan `Ctrl+C`.
 
+## 🌐 Jalan 24/7 gratis (GitHub Actions)
+
+Bot ini bisa jalan otomatis di server GitHub **tanpa laptop nyala**, pakai scheduled workflow (`.github/workflows/monitor.yml`). GitHub jalanin bot tiap 15 menit, cek sekali, kirim alert, lalu mati — hemat & sesuai desain.
+
+### Setup (sekali aja)
+1. Buka repo di GitHub → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+2. Bikin 2 secret ini:
+   - `TELEGRAM_BOT_TOKEN` → token bot lu
+   - `TELEGRAM_CHAT_ID` → chat_id lu
+3. Buka tab **Actions**, kalau workflow ke-disable klik **Enable**.
+4. Selesai — bot jalan otomatis tiap 15 menit. Mau tes sekarang: tab **Actions** → **Pemantau Saham** → **Run workflow**.
+
+### Catatan penting
+- **Jangan taruh token di `config.json` atau kode.** Cukup di Secrets. `.env` tetap buat lokal aja.
+- `update_rutin: true` = ringkasan dikirim **tiap 15 menit** (~96 pesan/hari). Kalau kebanyakan, set `false` atau ubah `cron` di workflow ke tiap jam (`"0 * * * *"`).
+- Workflow nyimpen `state.json` (commit balik otomatis) biar anti-spam tetap jalan antar run.
+- Cron GitHub bisa telat beberapa menit saat server sibuk — normal.
+- Scheduled workflow otomatis nonaktif kalau repo gak ada aktivitas 60 hari; tinggal enable lagi.
+
 ## Catatan
 - Data Yahoo Finance interval harian bisa delay ~15 menit dan gak real-time tick. Cukup buat swing/monitoring, bukan scalping.
 - Anti-spam: tiap jenis alert cuma dikirim sekali sampai kondisinya reset (biar gak nge-flood).

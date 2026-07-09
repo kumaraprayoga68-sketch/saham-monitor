@@ -1,0 +1,15 @@
+{
+  "BBCA.JK": {
+    "batas": "bawah",
+    "rsi": null
+  },
+  "AAPL": {
+    "batas": "atas",
+    "rsi": null,
+    "cross": "death"
+  },
+  "BTC-USD": {
+    "batas": "bawah",
+    "rsi": null
+  }
+}

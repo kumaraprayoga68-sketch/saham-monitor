@@ -31,14 +31,34 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+STATE_PATH = os.path.join(os.path.dirname(__file__), "state.json")
 
 # Simpan status alert terakhir biar gak spam kirim pesan yang sama terus.
+# Di mode cron (GitHub Actions), state ini dimuat dari & disimpan ke state.json
+# supaya anti-spam tetap jalan walau tiap run prosesnya baru.
 _alert_terakhir = {}
 
 
 def load_config():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_state():
+    global _alert_terakhir
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            _alert_terakhir = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        _alert_terakhir = {}
+
+
+def save_state():
+    try:
+        with open(STATE_PATH, "w", encoding="utf-8") as f:
+            json.dump(_alert_terakhir, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[WARN] Gagal simpan state: {e}")
 
 
 def kirim_telegram(pesan: str):
@@ -229,7 +249,18 @@ def satu_putaran(config):
         kirim_telegram(ringkasan_rutin(config, hasil))
 
 
-def main():
+def run_once():
+    """Satu kali cek lalu keluar. Dipakai oleh cron / GitHub Actions."""
+    load_state()
+    config = load_config()
+    satu_putaran(config)
+    save_state()
+    print("[OK] Run sekali selesai.")
+
+
+def main_loop():
+    """Mode nyala terus (buat jalan lokal di laptop)."""
+    load_state()
     config = load_config()
     interval = config.get("interval_minutes", 15)
     print(f"Bot jalan. Cek tiap {interval} menit. Ctrl+C buat stop.")
@@ -241,6 +272,7 @@ def main():
         try:
             config = load_config()  # reload biar bisa edit config tanpa restart
             satu_putaran(config)
+            save_state()
         except KeyboardInterrupt:
             print("\nBot dihentikan.")
             kirim_telegram("🛑 Bot pemantau saham dimatikan.")
@@ -251,4 +283,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Mode sekali kalau ada argumen --once atau env RUN_ONCE=1 (dipakai GitHub Actions).
+    if "--once" in sys.argv or os.getenv("RUN_ONCE") == "1":
+        run_once()
+    else:
+        main_loop()
