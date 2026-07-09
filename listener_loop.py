@@ -13,12 +13,35 @@ Jalanin: python listener_loop.py
 Env yang wajib: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 """
 
+import os
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
 
 import bot       # monitor: satu_putaran(), load/save_state(), load_config()
 import listener  # pakai ulang proses_pesan(), load/save_offset(), TOKEN
+
+
+def start_health_server():
+    """HTTP server mini biar Render nganggep ini 'web service' (plan gratis).
+    Balas 200 di semua path. Juga jadi target ping biar service gak ketiduran."""
+    port = int(os.getenv("PORT", "10000"))
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"bot aktif")
+
+        def log_message(self, *args):
+            pass  # jangan spam log
+
+    try:
+        HTTPServer(("0.0.0.0", port), H).serve_forever()
+    except Exception as e:
+        print(f"[health] server error: {e}")
 
 
 def jalankan_monitor():
@@ -37,6 +60,9 @@ def main():
     if not listener.TOKEN:
         print("[ERROR] TELEGRAM_BOT_TOKEN belum diisi.")
         return
+    # Nyalain health server di thread terpisah (buat Render web service gratis)
+    threading.Thread(target=start_health_server, daemon=True).start()
+
     offset = listener.load_offset()
     interval_menit = bot.load_config().get("interval_minutes", 15)
     print(f"Worker jalan: balas command instan + monitor tiap {interval_menit} menit. Ctrl+C stop.")

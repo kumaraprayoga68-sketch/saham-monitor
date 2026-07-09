@@ -1,15 +1,19 @@
-# Blueprint Render.com -> deploy listener nyala-terus.
+# Blueprint Render.com -> deploy listener nyala-terus (plan GRATIS).
+# Render gratis gak punya "worker", jadi pakai "web" + endpoint HTTP kecil.
 # Cara: Render Dashboard -> New -> Blueprint -> connect repo ini.
 # Lalu isi env var TELEGRAM_BOT_TOKEN & TELEGRAM_CHAT_ID di dashboard.
 services:
-  - type: worker
+  - type: web
     name: telegram-listener
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python listener_loop.py
+    healthCheckPath: /
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
