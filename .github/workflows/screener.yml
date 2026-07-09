@@ -1,0 +1,39 @@
+name: Screener Saham
+
+on:
+  schedule:
+    # Waktu UTC. Screener berat -> jalan terjadwal, bukan tiap 15 menit.
+    - cron: "30 9 * * 1-5"   # ~16:30 WIB, abis bursa IDX tutup (Sen-Jum)
+    - cron: "30 21 * * 1-5"  # abis bursa US tutup
+  workflow_dispatch: {}
+
+# Screener gak nyimpen state, jadi cukup read
+permissions:
+  contents: read
+
+concurrency:
+  group: screener-saham
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout kode
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependency
+        run: pip install -r requirements.txt
+
+      - name: Jalankan screener
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python screener.py

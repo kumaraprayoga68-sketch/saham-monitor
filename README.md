@@ -63,6 +63,34 @@ Bot ini bisa jalan otomatis di server GitHub **tanpa laptop nyala**, pakai sched
 - Cron GitHub bisa telat beberapa menit saat server sibuk — normal.
 - Scheduled workflow otomatis nonaktif kalau repo gak ada aktivitas 60 hari; tinggal enable lagi.
 
+## 🔎 Screener (scan banyak saham sekaligus)
+
+Selain watchlist, ada **screener** yang scan RATUSAN saham dari file `universe/` lalu kirim ringkasan kandidat yang lolos kriteria (bukan 1 notif per saham).
+
+- **Universe:** `universe/idx.txt` + `universe/us.txt` (1 ticker per baris). Edit bebas.
+- **Kriteria** (di `config.json` → `screener`): top gainer/loser, lonjakan volume, RSI ekstrem, golden/death cross.
+- **Jadwal:** `.github/workflows/screener.yml` jalan 2x/hari (abis bursa IDX & US tutup). Tes manual: **Actions → Screener Saham → Run workflow**.
+
+### Jalankan lokal
+```bash
+python screener.py
+```
+
+### Ekspansi ke SEMUA saham US
+Default universe US = ~120 saham likuid. Mau semua (ribuan)?
+```bash
+python build_universe.py us-all   # tulis ulang universe/us.txt dari Nasdaq Trader
+```
+> ⚠️ Ribuan ticker = scan lama & rawan rate-limit Yahoo. Naikkan `jeda_antar_chunk_detik` di config dan scan 1x/hari.
+
+### Atur sensitivitas (`config.json` → `screener.kriteria`)
+| Field | Arti |
+|---|---|
+| `perubahan_persen_min` | Ambang gainer/loser (mis. 5 = ±5%) |
+| `volume_vs_rata2_min` | Kelipatan volume vs rata2 20 hari (mis. 2 = 2x) |
+| `rsi_oversold` / `rsi_overbought` | Ambang RSI ekstrem |
+| `max_hasil_per_kategori` | Maks saham ditampilkan per kategori |
+
 ## Catatan
 - Data Yahoo Finance interval harian bisa delay ~15 menit dan gak real-time tick. Cukup buat swing/monitoring, bukan scalping.
 - Anti-spam: tiap jenis alert cuma dikirim sekali sampai kondisinya reset (biar gak nge-flood).

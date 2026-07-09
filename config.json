@@ -28,5 +28,19 @@
     "indikator_teknikal": true,
     "rsi_oversold": 30,
     "rsi_overbought": 70
+  },
+  "screener": {
+    "aktif": true,
+    "universe": ["idx", "us"],
+    "kriteria": {
+      "perubahan_persen_min": 5.0,
+      "volume_vs_rata2_min": 2.0,
+      "rsi_oversold": 30,
+      "rsi_overbought": 70,
+      "golden_death_cross": true
+    },
+    "max_hasil_per_kategori": 15,
+    "chunk_size": 100,
+    "jeda_antar_chunk_detik": 2
   }
 }
