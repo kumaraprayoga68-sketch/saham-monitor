@@ -1,22 +1,20 @@
-name: Pemantau Saham
+name: Listener Telegram
 
 on:
   schedule:
-    # Jalan tiap 15 menit. (Waktu UTC. Cron GitHub min. 5 menit, kadang telat dikit saat server sibuk.)
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {} # tombol "Run workflow" manual di tab Actions
+    # Tiap 5 menit (interval tercepat GitHub). Balasan command bisa delay s/d 5 menit.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
 
-# Perlu write biar bisa commit balik state.json (anti-spam antar run)
 permissions:
   contents: write
 
-# Cegah dua run numpuk barengan
 concurrency:
-  group: pemantau-saham
+  group: listener-telegram
   cancel-in-progress: false
 
 jobs:
-  cek:
+  listen:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout kode
@@ -31,22 +29,21 @@ jobs:
       - name: Install dependency
         run: pip install -r requirements.txt
 
-      - name: Jalankan bot (sekali)
+      - name: Proses pesan masuk
         env:
-          RUN_ONCE: "1"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python bot.py
+        run: python listener.py
 
-      - name: Simpan state (commit balik kalau berubah)
+      - name: Simpan offset (commit balik kalau berubah)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain state.json)" ]; then
-            git add state.json
-            git commit -m "chore: update state alert [skip ci]"
+          if [ -n "$(git status --porcelain tg_offset.json)" ]; then
+            git add tg_offset.json
+            git commit -m "chore: update offset telegram [skip ci]"
             git pull --rebase --autostash origin main
             git push
           else
-            echo "State tidak berubah, tidak commit."
+            echo "Offset tidak berubah, tidak commit."
           fi
