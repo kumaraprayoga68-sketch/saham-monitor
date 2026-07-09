@@ -73,6 +73,11 @@ def analisa_ticker(ticker, df):
         vol_avg = float(vols.tail(20).mean()) if len(vols) >= 20 else 0.0
         vol_ratio = (vol_now / vol_avg) if vol_avg > 0 else 0.0
 
+        # Rata2 nilai transaksi harian (harga x volume) buat filter likuiditas.
+        # IDR untuk .JK, USD untuk lainnya.
+        nilai_series = (closes.tail(20) * vols.tail(20)).dropna()
+        nilai_avg = float(nilai_series.mean()) if len(nilai_series) else 0.0
+
         rsi = bot.hitung_rsi(closes)
 
         ma20 = closes.rolling(20).mean()
@@ -107,6 +112,7 @@ def analisa_ticker(ticker, df):
             "pct_dari_high": pct_dari_high,
             "pct_dari_low": pct_dari_low,
             "gap": gap,
+            "nilai_avg": nilai_avg,
         }
     except Exception:
         return None
@@ -145,6 +151,51 @@ def scan_universe(tickers, chunk_size, jeda):
         time.sleep(jeda)
     print(f"  berhasil analisa {len(hasil)}/{total} ticker")
     return hasil
+
+
+def filter_likuiditas(hasil, likuid):
+    """Buang saham yang rata2 nilai transaksinya di bawah ambang.
+    Ambang beda untuk IDX (Rupiah) vs US (USD), ditentukan dari akhiran ticker."""
+    if not likuid or not likuid.get("aktif", False):
+        return hasil
+    min_idr = likuid.get("nilai_min_idr", 0)
+    min_usd = likuid.get("nilai_min_usd", 0)
+    keep = []
+    for h in hasil:
+        ambang = min_idr if h["ticker"].endswith(".JK") else min_usd
+        if h["nilai_avg"] >= ambang:
+            keep.append(h)
+    print(f"  filter likuiditas: {len(keep)}/{len(hasil)} lolos")
+    return keep
+
+
+def sinyal_gabungan(hasil, kriteria, min_sinyal, maxn):
+    """Saham yang kena beberapa sinyal bullish sekaligus = sinyal kuat."""
+    naik_min = kriteria.get("perubahan_persen_min", 5.0)
+    vol_min = kriteria.get("volume_vs_rata2_min", 2.0)
+    os_ = kriteria.get("rsi_oversold", 30)
+    dekat = kriteria.get("breakout_ambang_persen", 1.0)
+    gap_min = kriteria.get("gap_persen_min", 3.0)
+
+    kuat = []
+    for h in hasil:
+        tags = []
+        if h["chg"] >= naik_min:
+            tags.append("naik")
+        if h["vol_ratio"] >= vol_min:
+            tags.append("volume")
+        if h["gap"] >= gap_min:
+            tags.append("gap-up")
+        if h["pct_dari_high"] >= -dekat:
+            tags.append("breakout")
+        if h["cross"] == "golden":
+            tags.append("golden")
+        if h["rsi"] is not None and h["rsi"] <= os_:
+            tags.append("oversold")
+        if len(tags) >= min_sinyal:
+            kuat.append((h, tags))
+    kuat.sort(key=lambda x: len(x[1]), reverse=True)
+    return kuat[:maxn]
 
 
 def bikin_laporan(hasil, kriteria, maxn):
@@ -241,6 +292,16 @@ def bikin_laporan(hasil, kriteria, maxn):
     if gap_down:
         seksi.append("⬇️ <b>Gap Down</b>\n" + "\n".join(baris_gap(h) for h in gap_down))
 
+    # Sinyal gabungan (paling penting) -> taruh paling atas
+    min_sinyal = kriteria.get("min_sinyal_gabungan", 3)
+    kuat = sinyal_gabungan(hasil, kriteria, min_sinyal, maxn)
+    if kuat:
+        baris = [
+            f"  {h['ticker']}  {bot.format_harga(h['harga'])}  ({h['chg']:+.1f}%)  [{', '.join(tags)}]"
+            for h, tags in kuat
+        ]
+        seksi.insert(0, f"⭐ <b>SINYAL KUAT</b> (≥{min_sinyal} sinyal barengan)\n" + "\n".join(baris))
+
     return seksi
 
 
@@ -290,6 +351,7 @@ def main():
     print(f"Mulai scan {len(tickers)} saham...")
     t0 = time.time()
     hasil = scan_universe(tickers, chunk_size, jeda)
+    hasil = filter_likuiditas(hasil, scr.get("likuiditas"))
     durasi = time.time() - t0
 
     from datetime import datetime

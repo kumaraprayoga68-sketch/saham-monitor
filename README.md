@@ -69,6 +69,8 @@ Selain watchlist, ada **screener** yang scan RATUSAN saham dari file `universe/`
 
 - **Universe:** `universe/idx.txt` + `universe/us.txt` (1 ticker per baris). Edit bebas.
 - **Kriteria** (di `config.json` → `screener`): top gainer/loser, lonjakan volume, RSI ekstrem, golden/death cross, breakout high/low 52 minggu, gap up/down.
+- **⭐ Sinyal Kuat:** saham yang kena beberapa sinyal bullish sekaligus (naik + volume + breakout + gap, dst) ditaruh paling atas laporan.
+- **Filter likuiditas:** saham dengan nilai transaksi harian di bawah ambang (default 1 M IDR / 1 jt USD) di-skip biar sinyal gorengan gak masuk. Atur di `config.json` → `screener.likuiditas`.
 - **Jadwal:** `.github/workflows/screener.yml` jalan 2x/hari (abis bursa IDX & US tutup). Tes manual: **Actions → Screener Saham → Run workflow**.
 
 ### Jalankan lokal
@@ -91,7 +93,26 @@ python build_universe.py us-all   # tulis ulang universe/us.txt dari Nasdaq Trad
 | `rsi_oversold` / `rsi_overbought` | Ambang RSI ekstrem |
 | `breakout_ambang_persen` | Jarak ke high/low 52mg buat dianggap breakout (mis. 1 = dalam 1%) |
 | `gap_persen_min` | Ambang gap up/down (mis. 3 = pembukaan ±3% dari close kemarin) |
+| `min_sinyal_gabungan` | Min. jumlah sinyal barengan buat masuk "Sinyal Kuat" (mis. 3) |
 | `max_hasil_per_kategori` | Maks saham ditampilkan per kategori |
+
+## ⚡ Balasan Telegram INSTAN (host nyala-terus)
+
+Listener GitHub (cron) balesnya delay s/d 5 menit. Buat balasan `/harga` **< 1 detik**, jalankan `listener_loop.py` (long-polling) di host nyala-terus. File deploy udah disiapin: `Procfile` + `render.yaml`.
+
+> ⚠️ **JANGAN jalan barengan** sama workflow GitHub "Listener Telegram" — dua-duanya rebutan pesan lewat getUpdates. Kalau deploy host instan, **matiin** workflow listener di GitHub: Actions → Listener Telegram → ⋯ → **Disable workflow**.
+
+### Opsi A — Render.com (paling gampang, blueprint)
+1. Buka https://render.com → daftar gratis → **New** → **Blueprint** → connect repo `saham-monitor`.
+2. Render baca `render.yaml` otomatis. Isi 2 env var: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+3. **Apply/Create** → tunggu deploy → listener nyala 24/7, bales instan.
+
+### Opsi B — Railway.app
+1. https://railway.app → **New Project** → **Deploy from GitHub repo** → pilih repo.
+2. Start Command: `python listener_loop.py`
+3. **Variables** → tambah `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`. Deploy.
+
+> Tip: set env `PYTHONUNBUFFERED=1` biar log kebaca real-time di dashboard host.
 
 ## Catatan
 - Data Yahoo Finance interval harian bisa delay ~15 menit dan gak real-time tick. Cukup buat swing/monitoring, bukan scalping.

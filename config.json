@@ -39,7 +39,13 @@
       "rsi_overbought": 70,
       "golden_death_cross": true,
       "breakout_ambang_persen": 1.0,
-      "gap_persen_min": 3.0
+      "gap_persen_min": 3.0,
+      "min_sinyal_gabungan": 3
+    },
+    "likuiditas": {
+      "aktif": true,
+      "nilai_min_idr": 1000000000,
+      "nilai_min_usd": 1000000
     },
     "max_hasil_per_kategori": 15,
     "chunk_size": 100,
