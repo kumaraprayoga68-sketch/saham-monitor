@@ -1,0 +1,32 @@
+{
+  "interval_minutes": 15,
+  "watchlist": [
+    {
+      "ticker": "BBCA.JK",
+      "name": "Bank Central Asia",
+      "batas_atas": 11000,
+      "batas_bawah": 9000,
+      "alert_perubahan_persen": 3.0
+    },
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc",
+      "batas_atas": 250,
+      "batas_bawah": 190,
+      "alert_perubahan_persen": 4.0
+    },
+    {
+      "ticker": "BTC-USD",
+      "name": "Bitcoin",
+      "batas_atas": 120000,
+      "batas_bawah": 90000,
+      "alert_perubahan_persen": 5.0
+    }
+  ],
+  "fitur": {
+    "update_rutin": true,
+    "indikator_teknikal": true,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70
+  }
+}
