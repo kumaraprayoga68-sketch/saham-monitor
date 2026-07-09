@@ -17,7 +17,20 @@ import time
 
 import requests
 
+import bot       # monitor: satu_putaran(), load/save_state(), load_config()
 import listener  # pakai ulang proses_pesan(), load/save_offset(), TOKEN
+
+
+def jalankan_monitor():
+    """Satu putaran monitor watchlist (alert + ringkasan). Aman kalau gagal."""
+    try:
+        bot.load_state()
+        cfg = bot.load_config()
+        bot.satu_putaran(cfg)
+        bot.save_state()
+        print("[monitor] putaran selesai.")
+    except Exception as e:
+        print(f"[monitor] gagal: {e}")
 
 
 def main():
@@ -25,13 +38,19 @@ def main():
         print("[ERROR] TELEGRAM_BOT_TOKEN belum diisi.")
         return
     offset = listener.load_offset()
-    print("Listener loop jalan (long polling, balas instan). Ctrl+C buat stop.")
+    interval_menit = bot.load_config().get("interval_minutes", 15)
+    print(f"Worker jalan: balas command instan + monitor tiap {interval_menit} menit. Ctrl+C stop.")
+    listener.kirim(listener.OWNER_CHAT_ID,
+                   f"🤖 Bot AKTIF (mode nyala-terus).\nCommand instan + notif tiap {interval_menit} mnt.")
+
     url = f"https://api.telegram.org/bot{listener.TOKEN}/getUpdates"
+    monitor_berikutnya = 0.0  # langsung jalanin monitor sekali di awal
     while True:
         try:
+            # 1) Cek pesan masuk (long polling 30 detik)
             r = requests.get(
                 url,
-                params={"offset": offset, "timeout": 30},  # long polling 30 detik
+                params={"offset": offset, "timeout": 30},
                 timeout=40,
             )
             updates = r.json().get("result", [])
@@ -42,6 +61,12 @@ def main():
                     listener.proses_pesan(msg)
             if updates:
                 listener.save_offset(offset)
+
+            # 2) Monitor berkala (pakai interval dari config, di-reload tiap kali)
+            if time.time() >= monitor_berikutnya:
+                jalankan_monitor()
+                interval_menit = bot.load_config().get("interval_minutes", 15)
+                monitor_berikutnya = time.time() + interval_menit * 60
         except requests.RequestException as e:
             print(f"[WARN] koneksi error, coba lagi 5 detik: {e}")
             time.sleep(5)
