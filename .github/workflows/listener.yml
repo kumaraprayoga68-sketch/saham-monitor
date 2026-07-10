@@ -1,9 +1,9 @@
 name: Listener Telegram
 
 on:
-  schedule:
-    # Tiap 5 menit (interval tercepat GitHub). Balasan command bisa delay s/d 5 menit.
-    - cron: "*/5 * * * *"
+  # Jadwal cron DINONAKTIFKAN — listener sekarang jalan nyala-terus di host cloud
+  # (listener_loop.py di Render). Cron ini cuma bentrok/rebutan pesan kalau diaktifin.
+  # Tetap bisa dijalanin manual sebagai cadangan kalau host cloud mati.
   workflow_dispatch: {}
 
 permissions:

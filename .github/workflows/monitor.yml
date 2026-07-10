@@ -1,10 +1,10 @@
 name: Pemantau Saham
 
 on:
-  schedule:
-    # Jalan tiap 15 menit. (Waktu UTC. Cron GitHub min. 5 menit, kadang telat dikit saat server sibuk.)
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {} # tombol "Run workflow" manual di tab Actions
+  # Jadwal cron DINONAKTIFKAN — monitor watchlist sekarang dijalanin worker cloud
+  # (listener_loop.py di Render, tiap interval_minutes). Cron ini bikin notif dobel
+  # kalau diaktifin. Tetap bisa dijalanin manual sebagai cadangan.
+  workflow_dispatch: {}
 
 # Perlu write biar bisa commit balik state.json (anti-spam antar run)
 permissions:
